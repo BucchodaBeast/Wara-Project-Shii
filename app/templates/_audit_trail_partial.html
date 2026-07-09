@@ -1,0 +1,11 @@
+{% if logs %}
+    {% for log in logs %}
+    <div class="audit-entry">
+        <span class="mono">{{ log.changed_at }}</span> —
+        {{ log.old_status or "created" }} → <strong>{{ log.new_status }}</strong>
+        {% if log.note %}<br><span style="color: var(--text-muted);">{{ log.note }}</span>{% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div style="color: var(--text-muted);">No status changes logged yet.</div>
+{% endif %}
