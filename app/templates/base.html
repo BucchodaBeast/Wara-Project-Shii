@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Community Emergency & Resource Dispatcher{% endblock %}</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#e9edf3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body data-role="{{ g.user.role if g.user else '' }}">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <div id="offline-banner">⚠ You're offline — submissions will be saved and sent automatically once you're back online.</div>
+
+    <div class="navbar">
+        <div class="brand">
+            <span class="beacon" id="connectivity-beacon"></span>
+            <a href="{{ url_for('main.index') }}">Dispatcher</a>
+        </div>
+        <nav style="display:flex; align-items:center;">
+            <span id="queue-indicator" class="queue-indicator"></span>
+            {% if g.user %}
+                {% if g.user.role == 'citizen' %}
+                    <a href="{{ url_for('citizen.dashboard') }}">Dashboard</a>
+                    <a href="{{ url_for('citizen.report_need') }}">Report a Need</a>
+                    <a href="{{ url_for('citizen.offer_help') }}">Offer Help</a>
+                {% else %}
+                    <a href="{{ url_for('coordinator.dashboard') }}">Dashboard</a>
+                {% endif %}
+                <a href="{{ url_for('auth.logout') }}">Log out</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}">Log in</a>
+                <a href="{{ url_for('auth.register') }}" class="btn btn-primary" style="margin-left:1rem; padding:0.45rem 0.9rem;">Sign up</a>
+            {% endif %}
+        </nav>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer>Community Emergency & Resource Dispatcher — built for local resilience, not centralized bottlenecks.</footer>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/offline-sync.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

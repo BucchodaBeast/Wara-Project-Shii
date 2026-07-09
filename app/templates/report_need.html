@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Report a Need — Dispatcher{% endblock %}
+{% block content %}
+<div class="container-narrow" style="padding-top: 0.5rem;">
+    <h1 style="font-size: 1.5rem; margin-bottom: 0.3rem;">Report a need</h1>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">This gets sent to nearby coordinators immediately — or the moment you're back online.</p>
+
+    <div class="card form-card">
+        <form id="need-form">
+            <label for="category">Category</label>
+            <select name="category" id="category" required>
+                <option value="water">Water</option>
+                <option value="medical">Medical</option>
+                <option value="food">Food</option>
+                <option value="shelter">Shelter</option>
+                <option value="transport">Transport</option>
+                <option value="other">Other</option>
+            </select>
+
+            <label for="description">Describe what you need</label>
+            <textarea name="description" id="description" rows="3" required placeholder="e.g. Family of 5 needs drinking water, borehole is dry"></textarea>
+
+            <label>Urgency</label>
+            <div class="urgency-toggle">
+                <label class="urgency-critical"><input type="radio" name="urgency" value="critical"><span>Critical</span></label>
+                <label class="urgency-high"><input type="radio" name="urgency" value="high" checked><span>High</span></label>
+                <label class="urgency-medium"><input type="radio" name="urgency" value="medium"><span>Medium</span></label>
+                <label class="urgency-low"><input type="radio" name="urgency" value="low"><span>Low</span></label>
+            </div>
+
+            <label for="quantity_needed">How many people / units does this cover?</label>
+            <input type="number" name="quantity_needed" id="quantity_needed" min="1" step="1" value="1">
+
+            <input type="hidden" name="latitude" id="latitude">
+            <input type="hidden" name="longitude" id="longitude">
+
+            <button type="submit" class="btn btn-danger" style="width:100%; margin-top: 1.5rem;">Submit request</button>
+            <p id="form-status" style="font-size: 0.82rem; margin-top: 0.6rem; color: var(--text-muted);"></p>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((pos) => {
+        document.getElementById("latitude").value = pos.coords.latitude;
+        document.getElementById("longitude").value = pos.coords.longitude;
+    }, () => {}, { timeout: 4000 });
+}
+
+document.getElementById("need-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const statusEl = document.getElementById("form-status");
+    statusEl.textContent = "Submitting...";
+
+    const result = await submitWithOfflineFallback(form, "/api/requests");
+
+    if (result.queued) {
+        statusEl.textContent = "You're offline — saved on this device, will send automatically once reconnected.";
+        statusEl.style.color = "var(--amber)";
+        form.reset();
+    } else {
+        window.location.href = "{{ url_for('citizen.dashboard') }}";
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Sign up — Dispatcher{% endblock %}
+{% block content %}
+<div class="container-narrow" style="padding-top: 1rem;">
+    <h1 style="font-size: 1.6rem; margin-bottom: 0.4rem;">Create an account</h1>
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Takes less than a minute.</p>
+
+    <div class="card form-card">
+        <form method="POST">
+            <label for="name">Full name</label>
+            <input type="text" name="name" id="name" required>
+
+            <label for="email">Email</label>
+            <input type="email" name="email" id="email" required>
+
+            <label for="password">Password</label>
+            <input type="password" name="password" id="password" minlength="6" required>
+
+            <label>I am a...</label>
+            <div class="role-toggle">
+                <label>
+                    <input type="radio" name="role" value="citizen" id="role-citizen" checked>
+                    <span>Citizen</span>
+                </label>
+                <label>
+                    <input type="radio" name="role" value="coordinator" id="role-coordinator">
+                    <span>Coordinator</span>
+                </label>
+            </div>
+
+            <div id="invite-code-field" style="display:none;">
+                <label for="invite_code">Coordinator invite code</label>
+                <input type="text" name="invite_code" id="invite_code" autocomplete="off">
+                <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0.35rem 0 0;">
+                    Coordinators see every request/offer and can dispatch — ask your organizer for this code.
+                </p>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%; margin-top: 1.5rem;">Create account</button>
+        </form>
+    </div>
+
+    <p style="text-align:center; margin-top: 1.25rem; color: var(--text-muted); font-size: 0.88rem;">
+        Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a>
+    </p>
+</div>
+<script>
+    const inviteField = document.getElementById("invite-code-field");
+    const inviteInput = document.getElementById("invite_code");
+    function syncInviteField() {
+        const isCoordinator = document.getElementById("role-coordinator").checked;
+        inviteField.style.display = isCoordinator ? "block" : "none";
+        inviteInput.required = isCoordinator;
+    }
+    document.getElementById("role-citizen").addEventListener("change", syncInviteField);
+    document.getElementById("role-coordinator").addEventListener("change", syncInviteField);
+</script>
+{% endblock %}

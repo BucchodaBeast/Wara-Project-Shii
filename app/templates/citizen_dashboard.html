@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Your Dashboard — Dispatcher{% endblock %}
+{% block content %}
+<div class="dash-header">
+    <h1 style="font-size: 1.5rem;">Your activity</h1>
+    <div style="display:flex; gap:0.6rem;">
+        <a href="{{ url_for('citizen.report_need') }}" class="btn btn-danger">Report a Need</a>
+        <a href="{{ url_for('citizen.offer_help') }}" class="btn btn-primary">Offer Help</a>
+    </div>
+</div>
+
+<h2 style="font-size: 1.05rem; margin-bottom: 0.75rem; color: var(--text-muted);">Your requests</h2>
+<div class="entry-list" style="margin-bottom: 2rem;">
+    {% for r in requests %}
+    <div class="entry">
+        <div class="entry-top">
+            <div>
+                <div class="entry-title">{{ r.category|capitalize }}</div>
+                <div class="entry-desc">{{ r.description }}</div>
+            </div>
+            <span class="badge badge-{{ r.urgency }}">{{ r.urgency }}</span>
+        </div>
+        <div class="entry-meta">
+            <span class="badge badge-{{ r.status }}">{{ r.status }}</span>
+            <span class="mono" style="color: var(--slate-500); font-size: 0.78rem;">
+                {{ r.quantity_fulfilled|default(0)|round(1) }} / {{ r.quantity_needed|default(1)|round(1) }} covered
+            </span>
+            {% if r.synced_offline %}<span class="badge" style="border-color: var(--slate-500); color: var(--text-muted);">synced from offline</span>{% endif %}
+            <span class="mono" style="color: var(--slate-500); font-size: 0.75rem;">#{{ r.id }}</span>
+        </div>
+        {% for d in r.dispatches %}
+        <div class="dispatch-info">
+            <div class="dispatch-info-title">Help is on the way — {{ d.quantity|round(1) }} allocated</div>
+            {% if d.contact_name or d.contact_phone %}<div>Contact: {{ d.contact_name }} {{ d.contact_phone }}</div>{% endif %}
+            {% if d.meetup_location %}<div>Meetup: {{ d.meetup_location }}</div>{% endif %}
+            {% if d.meetup_notes %}<div>Notes: {{ d.meetup_notes }}</div>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">You haven't reported any needs yet.</div>
+    {% endfor %}
+</div>
+
+<h2 style="font-size: 1.05rem; margin-bottom: 0.75rem; color: var(--text-muted);">Your offers</h2>
+<div class="entry-list">
+    {% for o in offers %}
+    <div class="entry">
+        <div class="entry-top">
+            <div>
+                <div class="entry-title">{{ o.resource_type|capitalize }}{% if o.quantity %} — {{ o.quantity }}{% endif %}</div>
+                <div class="entry-desc">{{ o.description }}</div>
+            </div>
+        </div>
+        <div class="entry-meta">
+            <span class="badge badge-{{ o.status }}">{{ o.status }}</span>
+            {% if o.quantity_remaining is not none %}
+                <span class="mono" style="color: var(--slate-500); font-size: 0.78rem;">{{ o.quantity_remaining|round(1) }} / {{ o.quantity }} left</span>
+            {% endif %}
+            {% if o.synced_offline %}<span class="badge" style="border-color: var(--slate-500); color: var(--text-muted);">synced from offline</span>{% endif %}
+            <span class="mono" style="color: var(--slate-500); font-size: 0.75rem;">#{{ o.id }}</span>
+        </div>
+        {% for d in o.dispatches %}
+        <div class="dispatch-info">
+            <div class="dispatch-info-title">Matched — {{ d.quantity|round(1) }} allocated</div>
+            {% if d.contact_name or d.contact_phone %}<div>Contact: {{ d.contact_name }} {{ d.contact_phone }}</div>{% endif %}
+            {% if d.meetup_location %}<div>Meetup: {{ d.meetup_location }}</div>{% endif %}
+            {% if d.meetup_notes %}<div>Notes: {{ d.meetup_notes }}</div>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">You haven't offered any help yet.</div>
+    {% endfor %}
+</div>
+{% endblock %}

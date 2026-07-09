@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Coordinator Dashboard — Dispatcher{% endblock %}
+{% block content %}
+<div class="dash-header">
+    <h1 style="font-size: 1.5rem;">Dispatch board</h1>
+    <div class="view-toggle">
+        <button type="button" id="view-list-btn" class="active" onclick="setBoardView('list')">List</button>
+        <button type="button" id="view-map-btn" onclick="setBoardView('map')">Map</button>
+    </div>
+</div>
+
+<div class="stat-row">
+    <div class="stat">
+        <div class="num">{{ stats.pending }}</div>
+        <div class="lbl">Pending needs</div>
+    </div>
+    <div class="stat">
+        <div class="num">{{ stats.critical }}</div>
+        <div class="lbl">Critical &amp; pending</div>
+    </div>
+    <div class="stat">
+        <div class="num">{{ stats.available_offers }}</div>
+        <div class="lbl">Available offers</div>
+    </div>
+    <div class="stat">
+        <div class="num">{{ stats.active_dispatches }}</div>
+        <div class="lbl">Active dispatches</div>
+    </div>
+    <div class="stat">
+        <div class="num">{{ stats.unmatched }}</div>
+        <div class="lbl">Unmatched needs</div>
+    </div>
+    <div class="stat">
+        <div class="num">{{ stats.resolved_today }}</div>
+        <div class="lbl">Resolved today</div>
+    </div>
+</div>
+
+<div id="dispatch-map"></div>
+
+<div class="filter-bar">
+    <select id="filter-category">
+        <option value="">All categories</option>
+        <option value="water">Water</option>
+        <option value="medical">Medical</option>
+        <option value="food">Food</option>
+        <option value="shelter">Shelter</option>
+        <option value="transport">Transport</option>
+        <option value="other">Other</option>
+    </select>
+    <select id="filter-urgency">
+        <option value="">All urgencies</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+    </select>
+    <select id="sort-requests">
+        <option value="newest">Newest first</option>
+        <option value="urgency">Most urgent first</option>
+        <option value="score">Best match first</option>
+    </select>
+    <label class="checkbox"><input type="checkbox" id="filter-unmatched"> Unmatched only</label>
+    <span class="filter-count" id="filter-count"></span>
+</div>
+
+<div class="dash-grid split" id="board-list-view">
+    <div>
+        <h2 style="font-size: 1.05rem; margin-bottom: 0.75rem; color: var(--text-muted);">Needs</h2>
+        <div class="entry-list" id="requests-list" style="margin-bottom: 2rem;">
+            {% for r in requests %}
+            <div class="entry" data-category="{{ r.category }}" data-urgency="{{ r.urgency }}"
+                 data-unmatched="{{ 'true' if r.unmatched else 'false' }}"
+                 data-score="{{ r.top_matches[0].score if r.top_matches else 0 }}"
+                 data-created="{{ r.created_at }}">
+                <div class="entry-top">
+                    <div>
+                        <div class="entry-title">{{ r.category|capitalize }} <span class="mono" style="color: var(--slate-500); font-size: 0.75rem;">#{{ r.id }}</span></div>
+                        <div class="entry-desc">{{ r.description }}</div>
+                    </div>
+                    <span class="badge badge-{{ r.urgency }}">{{ r.urgency }}</span>
+                </div>
+                <div class="entry-meta">
+                    <span class="badge badge-{{ r.status }}">{{ r.status }}</span>
+                    <span class="mono" style="color: var(--slate-500); font-size: 0.78rem;">
+                        {{ r.quantity_fulfilled|default(0)|round(1) }} / {{ r.quantity_needed|default(1)|round(1) }} covered
+                    </span>
+                    {% if r.top_matches %}
+                        <span class="match-score">best match {{ r.top_matches[0].score }}</span>
+                    {% elif r.status == 'pending' %}
+                        <span class="unmatched-flag">⚠ no available match</span>
+                    {% endif %}
+                </div>
+
+                {% if r.top_matches and r.status == 'pending' %}
+                <div class="entry-actions" style="flex-direction: column; align-items: stretch; gap: 0.4rem;">
+                    {% for m in r.top_matches %}
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; font-size:0.82rem;">
+                        <span>{{ m.offer.resource_type|capitalize }}
+                            {% if m.offer.quantity_remaining is not none %}({{ m.offer.quantity_remaining|round(1) }} left){% endif %}
+                            — {{ m.distance_km }}km — score {{ m.score }}</span>
+                        <button type="button" onclick="openDispatchModal({{ r.id }}, {{ m.offer.id }}, '{{ r.category }}', '{{ m.offer.resource_type }}', {{ (r.quantity_needed|default(1)) - (r.quantity_fulfilled|default(0)) }}, {{ m.offer.quantity_remaining if m.offer.quantity_remaining is not none else (m.offer.quantity or 1) }})">Dispatch</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="entry-actions">
+                    <form method="POST" action="{{ url_for('coordinator.update_status', entity_type='request', entity_id=r.id) }}">
+                        <select name="status">
+                            <option value="pending" {% if r.status=='pending' %}selected{% endif %}>Pending</option>
+                            <option value="dispatched" {% if r.status=='dispatched' %}selected{% endif %}>Dispatched</option>
+                            <option value="resolved" {% if r.status=='resolved' %}selected{% endif %}>Resolved</option>
+                        </select>
+                        <input type="hidden" name="note" value="Updated via coordinator dashboard">
+                        <button type="submit">Update</button>
+                    </form>
+                    <button type="button" class="audit-toggle" onclick="toggleAuditLog('request', {{ r.id }}, this)">View audit trail</button>
+                </div>
+                <div class="audit-log" id="audit-request-{{ r.id }}"></div>
+
+                {% for d in r.dispatches %}
+                <div class="dispatch-info">
+                    <div class="dispatch-info-title">Dispatch #{{ d.id }} — {{ d.quantity|round(1) }} allocated</div>
+                    {% if d.contact_name or d.contact_phone %}<div>Contact: {{ d.contact_name }} {{ d.contact_phone }}</div>{% endif %}
+                    {% if d.meetup_location %}<div>Meetup: {{ d.meetup_location }}</div>{% endif %}
+                    {% if d.meetup_notes %}<div>Notes: {{ d.meetup_notes }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No requests yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div>
+        <h2 style="font-size: 1.05rem; margin-bottom: 0.75rem; color: var(--text-muted);">Offers</h2>
+        <div class="entry-list" id="offers-list">
+            {% for o in offers %}
+            <div class="entry" data-category="{{ o.resource_type }}" data-status="{{ o.status }}">
+                <div class="entry-top">
+                    <div>
+                        <div class="entry-title">{{ o.resource_type|capitalize }} <span class="mono" style="color: var(--slate-500); font-size: 0.75rem;">#{{ o.id }}</span></div>
+                        <div class="entry-desc">{{ o.description }}</div>
+                    </div>
+                </div>
+                <div class="entry-meta">
+                    <span class="badge badge-{{ o.status }}">{{ o.status }}</span>
+                    {% if o.quantity_remaining is not none %}
+                        <span class="mono" style="color: var(--slate-500); font-size: 0.78rem;">{{ o.quantity_remaining|round(1) }} / {{ o.quantity }} left</span>
+                    {% endif %}
+                </div>
+                <div class="entry-actions">
+                    <form method="POST" action="{{ url_for('coordinator.update_status', entity_type='offer', entity_id=o.id) }}">
+                        <select name="status">
+                            <option value="available" {% if o.status=='available' %}selected{% endif %}>Available</option>
+                            <option value="dispatched" {% if o.status=='dispatched' %}selected{% endif %}>Dispatched</option>
+                            <option value="resolved" {% if o.status=='resolved' %}selected{% endif %}>Resolved</option>
+                        </select>
+                        <input type="hidden" name="note" value="Updated via coordinator dashboard">
+                        <button type="submit">Update</button>
+                    </form>
+                    <button type="button" class="audit-toggle" onclick="toggleAuditLog('offer', {{ o.id }}, this)">View audit trail</button>
+                </div>
+                <div class="audit-log" id="audit-offer-{{ o.id }}"></div>
+
+                {% for d in o.dispatches %}
+                <div class="dispatch-info">
+                    <div class="dispatch-info-title">Dispatch #{{ d.id }} — {{ d.quantity|round(1) }} allocated</div>
+                    {% if d.contact_name or d.contact_phone %}<div>Contact: {{ d.contact_name }} {{ d.contact_phone }}</div>{% endif %}
+                    {% if d.meetup_location %}<div>Meetup: {{ d.meetup_location }}</div>{% endif %}
+                    {% if d.meetup_notes %}<div>Notes: {{ d.meetup_notes }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No offers yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="dispatch-modal">
+    <div class="modal-box">
+        <h3>Dispatch this pairing</h3>
+        <p class="modal-sub" id="dispatch-modal-sub"></p>
+        <form method="POST" action="{{ url_for('coordinator.dispatch') }}">
+            <input type="hidden" name="request_id" id="dispatch-request-id">
+            <input type="hidden" name="offer_id" id="dispatch-offer-id">
+
+            <label for="dispatch-quantity">Quantity to allocate</label>
+            <input type="number" name="quantity" id="dispatch-quantity" min="0.1" step="0.1" required>
+
+            <label for="contact_name">Contact name</label>
+            <input type="text" name="contact_name" id="contact_name" placeholder="Who should they ask for?">
+
+            <label for="contact_phone">Contact phone</label>
+            <input type="text" name="contact_phone" id="contact_phone" placeholder="Phone or radio channel">
+
+            <label for="meetup_location">Meetup location</label>
+            <input type="text" name="meetup_location" id="meetup_location" placeholder="e.g. Community hall, Main Rd">
+
+            <label for="meetup_notes">Notes</label>
+            <textarea name="meetup_notes" id="meetup_notes" rows="2" placeholder="Anything both parties should know"></textarea>
+
+            <div class="modal-close-row">
+                <button type="button" onclick="closeDispatchModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Confirm dispatch</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script id="map-markers-data" type="application/json">{{ map_markers_json|safe }}</script>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
