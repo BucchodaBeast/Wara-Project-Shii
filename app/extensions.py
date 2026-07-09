@@ -15,11 +15,15 @@ def get_supabase() -> Client:
     """
     global _supabase_client
     if _supabase_client is None:
-        url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_KEY")
+        url = (os.environ.get("SUPABASE_URL") or "").strip()
+        key = (os.environ.get("SUPABASE_KEY") or "").strip()
         if not url or not key:
             raise RuntimeError(
                 "SUPABASE_URL and SUPABASE_KEY must be set as environment variables."
+            )
+        if not url.startswith("https://"):
+            raise RuntimeError(
+                f"SUPABASE_URL looks malformed after stripping whitespace: {url!r}"
             )
         _supabase_client = create_client(url, key)
     return _supabase_client
