@@ -16,7 +16,7 @@ def create_app():
 
     app.before_request(load_current_user)
 
-    socketio.init_app(app, cors_allowed_origins="*", async_mode="eventlet")
+    socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
 
     from .routes.auth_routes import auth_bp
     from .routes.citizen_routes import citizen_bp
